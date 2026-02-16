@@ -7,7 +7,17 @@
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC In this notebook, we will see how we can use CDF data to propagate changes to downstream table. For this demo, we will create a new silver table called customer_orders by joining two streams: The oders table with the CDF data of the customers_table.
+
+# COMMAND ----------
+
 # MAGIC %run ../Includes/Copy-Datasets
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC We start by creating a function to upsert ranked updates into our new table. We will use the same logic we used before for the CDC feed procesing in a previous demo. Here, in order to get those new changes we are filtering for two change types: insert and update_postimage. We use the commit timestamp column to sort the records in the window. Also notice we are using a composite key for partitioning the window and for merging our updates as well. Run the cell to create the function...
 
 # COMMAND ----------
 
@@ -38,9 +48,23 @@ def batch_upsert(microBatchDF, batchId):
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC Next, we define our new table.
+
+# COMMAND ----------
+
 # MAGIC %sql
 # MAGIC CREATE TABLE IF NOT EXISTS customers_orders
 # MAGIC (order_id STRING, order_timestamp Timestamp, customer_id STRING, quantity BIGINT, total BIGINT, books ARRAY<STRUCT<book_id STRING, quantity BIGINT, subtotal BIGINT>>, email STRING, first_name STRING, last_name STRING, gender STRING, street STRING, city STRING, country STRING, row_time TIMESTAMP, processed_timestamp TIMESTAMP)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC Now we can define a streaming query to write our new table customers_orders. Here we are performing a join operation between two streaming tables. We start by reading the orders tableas a streaming source, and reading customers data as a streaming source. Then, we are performing an inner jpoin between these two data frames based on the customer_id key.
+# MAGIC
+# MAGIC When performing stream-stream joins, Saprk buffers past input as streaming state for both input streams, so that it can match every future input with past imputs and accordingly generate the joined results (Spark will automatically perform micro-batching).
+# MAGIC
+# MAGIC And of course, similar to the streaming duplication we saw previously, we can limit the state using watermarks. Run the below cell to process the records using the foreachBatch logic.
 
 # COMMAND ----------
 
@@ -68,8 +92,18 @@ process_customers_orders()
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC Review the data in the new table.
+
+# COMMAND ----------
+
 # MAGIC %sql
 # MAGIC SELECT * FROM customers_orders
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC We can now land a new data file to see how changes will be propagated through our pipeline.
 
 # COMMAND ----------
 
@@ -79,6 +113,11 @@ bookstore.process_orders_silver()
 bookstore.process_customers_silver()
 
 process_customers_orders()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC New updates have been propagated and merged into the new table.
 
 # COMMAND ----------
 

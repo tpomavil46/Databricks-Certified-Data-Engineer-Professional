@@ -10,7 +10,7 @@ def customers_bronze_cdc():
     country_lookup_df = spark.read.table("country_lookup")
 
     return (spark.readStream
-                    .table("bronze")
+                    .table("timpomaville.bookstore_etl_pro.bronze")
                     .filter("topic = 'customers'")
                     .select(F.from_json(F.col("value").cast("string"), schema).alias("v"))
                     .select("v.*")
@@ -19,12 +19,12 @@ def customers_bronze_cdc():
             )
 
 dp.create_streaming_table(
-    name = "customers_silver"
+    name = "timpomaville.bookstore_etl_pro.customers_silver"
 )
 
 # Now we can use the auto CDC feature to create a silver table from the bronze table.
 dp.create_auto_cdc_flow(
-    target = "customers_silver",
+    target = "timpomaville.bookstore_etl_pro.customers_silver",
     source = "customers_bronze_cdc",
     keys = ["customer_id"], # primary key
     sequence_by = F.col("row_time"),
@@ -41,7 +41,7 @@ dp.create_auto_cdc_flow(
 )
 def countries_stats():
     orders_df = spark.read.table("timpomaville.bookstore_etl_pro.orders_silver")
-    customers_df = spark.read.table("customers_silver")
+    customers_df = spark.read.table("timpomaville.bookstore_etl_pro.customers_silver")
 
     return (orders_df.join(customers_df, ["customer_id"], "inner")
                         .withColumn("order_date", F.date_trunc("DAY", F.col("order_timestamp")))
